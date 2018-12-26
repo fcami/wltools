@@ -114,9 +114,20 @@ def decodeCelHeader(fd, fsize):
 	print("Offset to second frame: %s" % fli_offset2)
 	return (fli_offset1, fli_offset2)
 
+def decodeCelFrameChunk(fd, offset):
+	fd.seek(offset, 0)
+	chunk_size = struct.unpack('<I', fd.read(4))[0]
+	chunk_type = struct.unpack('<H', fd.read(2))[0]
+	for cktype in list(FliChunkType):
+		if chunk_type == cktype.value:
+			print("Found %s chunk of size %s" % (cktype.name, chunk_size))
+	return chunk_size
+
 def decodeCelFrame(fd, frameoffset):
 	fd.seek(frameoffset, 0)
 	header_size = struct.unpack('<I', fd.read(4))[0]
+	# important for animations: this is the only way
+	# to determine the next frame's offset
 	print("Frame chunk size: %s" % header_size)
 	chunk_id1 = struct.unpack('<c', fd.read(1))[0]
 	chunk_id2 = struct.unpack('<c', fd.read(1))[0]
@@ -133,13 +144,10 @@ def decodeCelFrame(fd, frameoffset):
 		struct.unpack('<H', fd.read(2))[0]
 
 	for i in range(0, int(fli_chunks)):
-		#readChunk()
-		chunk_size = struct.unpack('<I', fd.read(4))[0]
-		chunk_type = struct.unpack('<H', fd.read(2))[0]
-		for cktype in list(FliChunkType):
-			if chunk_type == cktype.value:
-				print("Found %s chunk of size %s" % (cktype.name, chunk_size))
-		fd.seek(chunk_size-6, 1)
+		pos = fd.tell()
+		chunksize = decodeCelFrameChunk(fd, fd.tell())
+		fd.seek(pos+chunksize, 0)
+
 
 
 def main():
@@ -157,6 +165,7 @@ def main():
         with open(args.celfile, 'rb') as fd:
             (fli_offset1, fli_offset2) = decodeCelHeader(fd, fsize)
             decodeCelFrame(fd, fli_offset1)
+            decodeCelFrame(fd, fli_offset2)
     except:
         sys.stderr.write('Could not read CEL file.')
         sys.exit(1)
